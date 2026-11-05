@@ -1,0 +1,826 @@
+# =============================================================================
+# Ogrevanje
+# ===========================================================================@=
+# Nagajivi škrat je pokvaril zamike v funkciji `vsebuje_vprasaj` in premešal
+# vrstice v funkciji `odstrani_presledke`. Popravite obe funkciji tako, da
+# uspešno opravita vse teste.
+# 
+# *Funkciji sta že definirani v datoteki.*
+# =============================================================================
+def vsebuje_vprasaj(niz):
+    for znak in niz:
+        if znak == "?":
+            return True
+    return False
+
+def odstrani_presledke(niz):
+    nov_niz = ""
+    for znak in niz:
+        if not znak == " ":
+            nov_niz += znak
+    return nov_niz
+# ===========================================================================@=
+# Sestavite funkcijo `stevilo_znakov`, ki v podanem nizu prešteje
+# število znakov, pri čemer se presledki ne upoštevajo. Zgled:
+# 
+#     >>> stevilo_znakov('B     u!')
+#     3
+# =============================================================================
+
+def stevilo_znakov(niz):
+    nov_niz = 0
+    for znak in niz:
+        if not znak == " ":
+            nov_niz += 1
+    return nov_niz
+
+# ===========================================================================@=
+# Sestavite funkcijo `prezrcali`, ki vrne prezrcaljen niz.
+# 
+#     >>> prezrcali('abeceda')
+#     'adeceba'
+# =============================================================================
+
+def prezrcali(niz):
+    return niz[::-1]
+
+# ===========================================================================@=
+# Sestavite funkcijo `je_palindrom`, ki preveri, če je niz palindrom.
+# 
+#     >>> je_palindrom('kajak')
+#     True
+# =============================================================================
+
+def je_palindrom(niz):
+    if prezrcali(niz) == niz:
+        return True
+    return False
+
+# ===========================================================================@=
+# Napišite funkcijo `odstrani_ponovljene_presledke`, ki sprejme niz in vrne nov
+# niz, kjer večkratne ponovitve presledka zamenjamo z enojnim presledkom.
+# 
+#     >>> odstrani_ponovljene_presledke('  * -   *   - * ')
+#     ' * - * - * '
+# =============================================================================
+
+def odstrani_ponovljene_presledke(niz):
+    prev = ""
+    nizout = ""
+    for char in niz:
+        if prev == " ":
+            if char != " ":
+                nizout += char
+        else:
+            nizout += char
+        prev = char
+    return nizout
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ============================@= *-*-*-*-*-*-*-* =@============================
+
+"Če vam Python sporoča, da je v tej vrstici sintaktična napaka,"
+"se napaka v resnici skriva v zadnjih vrsticah vaše kode."
+
+"Kode od tu naprej NE SPREMINJAJTE!"
+
+import os
+import traceback
+import urllib.error
+
+_TOMO_I18N_STRINGS = {
+    'ERROR_EQUAL': 'Izraz {0} vrne {1!r} instead of {2!r}.',
+    'HINT': 'Namig: {}',
+}
+
+
+import dataclasses
+import io
+import sys
+from contextlib import contextmanager
+from typing import List, Optional, Tuple
+
+
+class Check:
+    class VisibleStringIO(io.StringIO):
+        def read(self, size=None):
+            x = io.StringIO.read(self, size)
+            print(x, end="")
+            return x
+
+        def readline(self, size=None):
+            line = io.StringIO.readline(self, size)
+            print(line, end="")
+            return line
+
+    class TimeoutError(Exception):
+        pass
+
+    @dataclasses.dataclass(slots=True)
+    class Part:
+        solution: str
+        description: Optional[str] = None
+        template: Optional[str] = None
+        test_script: Optional[str] = None
+        is_valid: bool = True
+        feedback: List[str] = dataclasses.field(default_factory=list)
+        secret: List[Tuple[str, Optional[str]]] = dataclasses.field(default_factory=list)
+
+    parts: List[Part] = []
+    current_part: Optional[Part] = None
+    part_counter: Optional[int] = None
+    i18n_strings = globals().get('_TOMO_I18N_STRINGS', {})
+
+    @staticmethod
+    def part():
+        if Check.part_counter is None:
+            Check.part_counter = 0
+        else:
+            Check.part_counter += 1
+        Check.current_part = Check.parts[Check.part_counter]
+
+    @staticmethod
+    def feedback(message, *args, **kwargs):
+        Check.current_part.feedback.append(message.format(*args, **kwargs))
+
+    @staticmethod
+    def error(message, *args, **kwargs):
+        Check.current_part.is_valid = False
+        Check.feedback(message, *args, **kwargs)
+
+    @staticmethod
+    def clean(x, digits=6, typed=False):
+        t = type(x)
+        if t is float:
+            x = round(x, digits)
+            # Since -0.0 differs from 0.0 even after rounding,
+            # we change it to 0.0 abusing the fact it behaves as False.
+            v = x if x else 0.0
+        elif t is complex:
+            v = complex(
+                Check.clean(x.real, digits, typed), Check.clean(x.imag, digits, typed)
+            )
+        elif t is list:
+            v = list([Check.clean(y, digits, typed) for y in x])
+        elif t is tuple:
+            v = tuple([Check.clean(y, digits, typed) for y in x])
+        elif t is dict:
+            v = sorted(
+                [
+                    (Check.clean(k, digits, typed), Check.clean(v, digits, typed))
+                    for (k, v) in x.items()
+                ]
+            )
+        elif t is set:
+            v = sorted([Check.clean(y, digits, typed) for y in x])
+        else:
+            v = x
+        return (t, v) if typed else v
+
+    @staticmethod
+    def secret(x, hint=None, clean=None):
+        clean = Check.get("clean", clean)
+        Check.current_part.secret.append((str(clean(x)), hint))
+
+    @staticmethod
+    def equal(expression, expected_result, clean=None, env=None, update_env=None):
+        global_env = Check.init_environment(env=env, update_env=update_env)
+        clean = Check.get("clean", clean)
+        actual_result = eval(expression, global_env)
+        if clean(actual_result) != clean(expected_result):
+            Check.error(
+                Check.i18n_strings['ERROR_EQUAL'],
+                expression,
+                actual_result,
+                expected_result,
+            )
+            return False
+        else:
+            return True
+
+    @staticmethod
+    def approx(expression, expected_result, tol=1e-6, env=None, update_env=None):
+        try:
+            import numpy as np
+        except ImportError:
+            Check.error("Namestiti morate numpy.")
+            return False
+        if not isinstance(expected_result, np.ndarray):
+            Check.error("Ta funkcija je namenjena testiranju za tip np.ndarray.")
+
+        if env is None:
+            env = dict()
+        env.update({"np": np})
+        global_env = Check.init_environment(env=env, update_env=update_env)
+        actual_result = eval(expression, global_env)
+        if type(actual_result) is not type(expected_result):
+            Check.error(
+                "Rezultat ima napačen tip. Pričakovan tip: {}, dobljen tip: {}.",
+                type(expected_result).__name__,
+                type(actual_result).__name__,
+            )
+            return False
+        exp_shape = expected_result.shape
+        act_shape = actual_result.shape
+        if exp_shape != act_shape:
+            Check.error(
+                "Obliki se ne ujemata. Pričakovana oblika: {}, dobljena oblika: {}.",
+                exp_shape,
+                act_shape,
+            )
+            return False
+        try:
+            np.testing.assert_allclose(
+                expected_result, actual_result, atol=tol, rtol=tol
+            )
+            return True
+        except AssertionError as e:
+            Check.error("Rezultat ni pravilen." + str(e))
+            return False
+
+    @staticmethod
+    def run(statements, expected_state, clean=None, env=None, update_env=None):
+        code = "\n".join(statements)
+        statements = "  >>> " + "\n  >>> ".join(statements)
+        global_env = Check.init_environment(env=env, update_env=update_env)
+        clean = Check.get("clean", clean)
+        exec(code, global_env)
+        errors = []
+        for x, v in expected_state.items():
+            if x not in global_env:
+                errors.append(
+                    "morajo nastaviti spremenljivko {0}, vendar je ne".format(x)
+                )
+            elif clean(global_env[x]) != clean(v):
+                errors.append(
+                    "nastavijo {0} na {1!r} namesto na {2!r}".format(
+                        x, global_env[x], v
+                    )
+                )
+        if errors:
+            Check.error("Ukazi\n{0}\n{1}.", statements, ";\n".join(errors))
+            return False
+        else:
+            return True
+
+    @staticmethod
+    @contextmanager
+    def in_file(filename, content, encoding=None):
+        encoding = Check.get("encoding", encoding)
+        with open(filename, "w", encoding=encoding) as f:
+            for line in content:
+                print(line, file=f)
+        old_feedback = Check.current_part.feedback[:]
+        yield
+        new_feedback = Check.current_part.feedback[len(old_feedback):]
+        Check.current_part.feedback = old_feedback
+        if new_feedback:
+            new_feedback = ["\n    ".join(error.split("\n")) for error in new_feedback]
+            Check.error(
+                "Pri vhodni datoteki {0} z vsebino\n  {1}\nso se pojavile naslednje napake:\n- {2}",
+                filename,
+                "\n  ".join(content),
+                "\n- ".join(new_feedback),
+            )
+
+    @staticmethod
+    @contextmanager
+    def input(content, visible=None):
+        old_stdin = sys.stdin
+        old_feedback = Check.current_part.feedback[:]
+        try:
+            with Check.set_stringio(visible):
+                sys.stdin = Check.get("stringio")("\n".join(content) + "\n")
+                yield
+        finally:
+            sys.stdin = old_stdin
+        new_feedback = Check.current_part.feedback[len(old_feedback):]
+        Check.current_part.feedback = old_feedback
+        if new_feedback:
+            new_feedback = ["\n  ".join(error.split("\n")) for error in new_feedback]
+            Check.error(
+                "Pri vhodu\n  {0}\nso se pojavile naslednje napake:\n- {1}",
+                "\n  ".join(content),
+                "\n- ".join(new_feedback),
+            )
+
+    @staticmethod
+    def out_file(filename, content, encoding=None):
+        encoding = Check.get("encoding", encoding)
+        with open(filename, encoding=encoding) as f:
+            out_lines = f.readlines()
+        equal, diff, line_width = Check.difflines(out_lines, content)
+        if equal:
+            return True
+        else:
+            Check.error(
+                "Izhodna datoteka {0}\n  je enaka{1}  namesto:\n  {2}",
+                filename,
+                (line_width - 7) * " ",
+                "\n  ".join(diff),
+            )
+            return False
+
+    @staticmethod
+    def output(expression, content, env=None, update_env=None):
+        global_env = Check.init_environment(env=env, update_env=update_env)
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+        too_many_read_requests = False
+        try:
+            exec(expression, global_env)
+        except EOFError:
+            too_many_read_requests = True
+        finally:
+            output = sys.stdout.getvalue().rstrip().splitlines()
+            sys.stdout = old_stdout
+        equal, diff, line_width = Check.difflines(output, content)
+        if equal and not too_many_read_requests:
+            return True
+        else:
+            if too_many_read_requests:
+                Check.error("Program prevečkrat zahteva uporabnikov vnos.")
+            if not equal:
+                Check.error(
+                    "Program izpiše{0}  namesto:\n  {1}",
+                    (line_width - 13) * " ",
+                    "\n  ".join(diff),
+                )
+            return False
+
+    @staticmethod
+    def difflines(actual_lines, expected_lines):
+        actual_len, expected_len = len(actual_lines), len(expected_lines)
+        if actual_len < expected_len:
+            actual_lines += (expected_len - actual_len) * ["\n"]
+        else:
+            expected_lines += (actual_len - expected_len) * ["\n"]
+        equal = True
+        line_width = max(
+            len(actual_line.rstrip())
+            for actual_line in actual_lines + ["Program izpiše"]
+        )
+        diff = []
+        for out, given in zip(actual_lines, expected_lines):
+            out, given = out.rstrip(), given.rstrip()
+            if out != given:
+                equal = False
+            diff.append(
+                "{0} {1} {2}".format(
+                    out.ljust(line_width), "|" if out == given else "*", given
+                )
+            )
+        return equal, diff, line_width
+
+    @staticmethod
+    def init_environment(env=None, update_env=None):
+        global_env = globals()
+        if not Check.get("update_env", update_env):
+            global_env = dict(global_env)
+        global_env.update(Check.get("env", env))
+        return global_env
+
+    @staticmethod
+    def generator(
+        expression,
+        expected_values,
+        should_stop=None,
+        further_iter=None,
+        clean=None,
+        env=None,
+        update_env=None,
+    ):
+        from types import GeneratorType
+
+        global_env = Check.init_environment(env=env, update_env=update_env)
+        clean = Check.get("clean", clean)
+        gen = eval(expression, global_env)
+        if not isinstance(gen, GeneratorType):
+            Check.error("Izraz {0} ni generator.", expression)
+            return False
+
+        try:
+            for iteration, expected_value in enumerate(expected_values):
+                actual_value = next(gen)
+                if clean(actual_value) != clean(expected_value):
+                    Check.error(
+                        "Vrednost #{0}, ki jo vrne generator {1} je {2!r} namesto {3!r}.",
+                        iteration,
+                        expression,
+                        actual_value,
+                        expected_value,
+                    )
+                    return False
+            for _ in range(Check.get("further_iter", further_iter)):
+                next(gen)  # we will not validate it
+        except StopIteration:
+            Check.error("Generator {0} se prehitro izteče.", expression)
+            return False
+
+        if Check.get("should_stop", should_stop):
+            try:
+                next(gen)
+                Check.error("Generator {0} se ne izteče (dovolj zgodaj).", expression)
+            except StopIteration:
+                pass  # this is fine
+        return True
+
+    @staticmethod
+    def summarize():
+        # TODO: update calculating subtask points and stuff
+        #if len(subtask_points) != len(Check.parts):
+        #    print("Subtask points {} don't match task parts: {}.".format(subtask_points, Check.parts))
+        all_valid = True
+        for i, part in enumerate(Check.parts):
+            if not part.is_valid:
+                print("{0}. skupina testov nima veljavne rešitve.".format(i + 1))
+                all_valid = False
+            else:
+                print("{0}. skupina testov ima veljavno rešitev.".format(i + 1))
+            for message in part.feedback:
+                print("  - {0}".format("\n    ".join(message.splitlines())))
+        return all_valid
+
+    settings_stack = [
+        {
+            "clean": clean.__func__,
+            "encoding": None,
+            "env": {},
+            "further_iter": 0,
+            "should_stop": False,
+            "stringio": VisibleStringIO,
+            "update_env": False,
+        }
+    ]
+
+    @staticmethod
+    def get(key, value=None):
+        if value is None:
+            return Check.settings_stack[-1][key]
+        return value
+
+    @staticmethod
+    @contextmanager
+    def set(**kwargs):
+        settings = dict(Check.settings_stack[-1])
+        settings.update(kwargs)
+        Check.settings_stack.append(settings)
+        try:
+            yield
+        finally:
+            Check.settings_stack.pop()
+
+    @staticmethod
+    @contextmanager
+    def set_clean(clean=None, **kwargs):
+        clean = clean or Check.clean
+        with Check.set(clean=(lambda x: clean(x, **kwargs)) if kwargs else clean):
+            yield
+
+    @staticmethod
+    @contextmanager
+    def set_environment(**kwargs):
+        env = dict(Check.get("env"))
+        env.update(kwargs)
+        with Check.set(env=env):
+            yield
+
+    @staticmethod
+    @contextmanager
+    def set_stringio(stringio):
+        if stringio is True:
+            stringio = Check.VisibleStringIO
+        elif stringio is False:
+            stringio = io.StringIO
+        if stringio is None or stringio is Check.get("stringio"):
+            yield
+        else:
+            with Check.set(stringio=stringio):
+                yield
+
+    @staticmethod
+    @contextmanager
+    def time_limit(timeout_seconds=1):
+        from signal import SIGINT, raise_signal
+        from threading import Timer
+
+        def interrupt_main():
+            raise_signal(SIGINT)
+
+        timer = Timer(timeout_seconds, interrupt_main)
+        timer.start()
+        try:
+            yield
+        except KeyboardInterrupt:
+            raise Check.TimeoutError
+        finally:
+            timer.cancel()
+
+
+import json
+import os
+import re
+import shutil
+import urllib.error
+import urllib.request
+from typing import Any, Dict, List, Optional
+
+
+class _Tomo_Submit:
+    PART_REGEX = re.compile(
+        r"# ={20,}+@=\s*\n"  # beginning of header
+        r"(:?\s*#(:? [^\n]*)?\n)+?"  # description
+        r"\s*# ={20,}\s*?\n"  # end of header
+        r"(?P<solution>.*?)"  # solution
+        r"(?=\n\s*# ={20,}@=)",  # beginning of next part
+        flags=re.DOTALL | re.MULTILINE,
+    )
+
+    @staticmethod
+    def extract_submission(source: str, n_parts: int) -> list[Check.Part]:
+        parts = [
+            Check.Part(
+                solution=m.group("solution")
+            )
+            for m in _Tomo_Submit.PART_REGEX.finditer(source)
+        ]
+        if len(parts) != n_parts:
+            raise ValueError("Invalid format.")
+        return parts
+
+    @staticmethod
+    def submit_parts(url: str, parts: List['Check.Part'], filename: str, session_data: str):
+        submitted_parts = []
+        submitted_parts = [{
+            "solution": part.solution,
+            "local_tests_pass": part.is_valid,  # TODO report status (OK/WA/RTE/TLE)
+            "remote_test_results": [x[0] for x in part.secret],  # TODO report status (OK/WA/RTE/TLE)
+            "feedback": part.feedback,
+            } for part in parts
+        ]
+        payload = {
+            "session_data": session_data,
+            "parts": submitted_parts,
+            "filename": os.path.basename(filename),
+        }
+        headers = {"content-type": "application/json"}
+        data = json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(url, data=data, headers=headers)
+        response = urllib.request.urlopen(request)
+        return json.loads(response.read().decode("utf-8"))
+
+    @staticmethod
+    def backup(filename: str) -> str:
+        backup_filename: Optional[str] = None
+        suffix = 1
+        while not backup_filename or os.path.exists(backup_filename):
+            backup_filename = "{0}.{1}".format(filename, suffix)
+            suffix += 1
+        shutil.copy(filename, backup_filename)
+        return backup_filename
+
+    @staticmethod
+    def update_parts(hint_string: str, old_parts: List['Check.Part'], response: Dict[str, Any]):
+        for part, feedback in zip(old_parts, response["parts"]):
+            part.feedback = feedback["feedback"]
+            valid_before = part.is_valid
+            part.is_valid = feedback["solved"]
+            valid_after = part.is_valid
+            if valid_before and not valid_after:
+                wa_index = feedback["wa_testcase_idx"]
+                hint = part.secret[wa_index][1]
+                if hint:
+                    part.feedback.append(hint_string.format(hint))
+
+
+
+
+
+
+def _tomo_validate_current_file():
+    _tomo_user_filename = os.path.abspath(sys.argv[0])
+    with open(_tomo_user_filename, 'r', encoding='utf8') as _tomo_user_file:
+        _tomo_user_raw_source = _tomo_user_file.read()
+    try:
+        Check.parts = _Tomo_Submit.extract_submission(_tomo_user_raw_source, 5)
+    except ValueError:
+        print("Neveljavna oblika datoteke. Ne spreminjaj zadnjega komentarja.")
+        exit(1)
+
+    Check.part()
+    try:
+        Check.equal('vsebuje_vprasaj("")', False)
+        Check.equal('vsebuje_vprasaj("?")', True)
+        Check.equal('vsebuje_vprasaj("Banana")', False) and \
+        Check.equal('vsebuje_vprasaj("Poma(???)ranča.")', True) and \
+        Check.equal('vsebuje_vprasaj("Kivi?")', True)
+        
+        Check.equal('odstrani_presledke("")', '')
+        Check.equal('odstrani_presledke("   ")', '')
+        Check.equal('odstrani_presledke("Kdor drugemu jamo koplje kruha strada.")', "Kdordrugemujamokopljekruhastrada.")
+    except Check.TimeoutError:
+        Check.error("Dovoljen čas izvajanja presežen.")
+    except Exception:
+        Check.error(
+            "Testi sprožijo izjemo\n  {0}",
+            "\n  ".join(traceback.format_exc().split("\n"))[:-2],
+        )
+
+    Check.part()
+    try:
+        test_data = [
+            ("""stevilo_znakov('Višje, hitreje, močneje!')""", 22),
+            ("""stevilo_znakov('Bu!')""", 3),
+            ("""stevilo_znakov('Matej ima tri hruške!')""", 18),
+            ("""stevilo_znakov('Eno ima za Alenko.')""", 15),
+            ("""stevilo_znakov('   ')""", 0),
+        ]
+        for td in test_data:
+            if not Check.equal(*td):
+                break
+    except Check.TimeoutError:
+        Check.error("Dovoljen čas izvajanja presežen.")
+    except Exception:
+        Check.error(
+            "Testi sprožijo izjemo\n  {0}",
+            "\n  ".join(traceback.format_exc().split("\n"))[:-2],
+        )
+
+    Check.part()
+    try:
+        Check.equal('prezrcali("x")', 'x')
+        Check.equal('prezrcali("xy")', 'yx')
+        Check.equal('prezrcali("abeceda")', 'adeceba')
+        Check.equal('prezrcali("alisebomartanatramobesila")', 'alisebomartanatramobesila')
+    except Check.TimeoutError:
+        Check.error("Dovoljen čas izvajanja presežen.")
+    except Exception:
+        Check.error(
+            "Testi sprožijo izjemo\n  {0}",
+            "\n  ".join(traceback.format_exc().split("\n"))[:-2],
+        )
+
+    Check.part()
+    try:
+        Check.equal('je_palindrom("kajak")', True)
+        Check.equal('je_palindrom("abeceda")', False)
+        Check.equal('je_palindrom("oko")', True)
+        Check.equal('je_palindrom("neradodaren")', True)
+    except Check.TimeoutError:
+        Check.error("Dovoljen čas izvajanja presežen.")
+    except Exception:
+        Check.error(
+            "Testi sprožijo izjemo\n  {0}",
+            "\n  ".join(traceback.format_exc().split("\n"))[:-2],
+        )
+
+    Check.part()
+    try:
+        Check.equal('odstrani_ponovljene_presledke("  * -   *   - * ")', ' * - * - * ')
+        Check.equal('odstrani_ponovljene_presledke("M  a    t  i    j   a")', 'M a t i j a')
+        Check.equal('odstrani_ponovljene_presledke("  ovca  ")', ' ovca ')
+        Check.equal('odstrani_ponovljene_presledke("      ")', ' ')
+        Check.equal('odstrani_ponovljene_presledke("")', '')
+        Check.equal('odstrani_ponovljene_presledke(" ")', ' ')
+    except Check.TimeoutError:
+        Check.error("Dovoljen čas izvajanja presežen.")
+    except Exception:
+        Check.error(
+            "Testi sprožijo izjemo\n  {0}",
+            "\n  ".join(traceback.format_exc().split("\n"))[:-2],
+        )
+
+    print("Shranjujem rešitve na strežnik... ", end="")
+    try:
+        _tomo_url = "https://kokoska.fmf.uni-lj.si/tomo/submit/"
+        _tomo_session_data = ""
+        _tomo_response = _Tomo_Submit.submit_parts(_tomo_url, Check.parts, _tomo_user_filename, _tomo_session_data)
+    except urllib.error.URLError:
+        _tomo_error_message = (
+            "\n"
+            "-------------------------------------------------------------------\n"
+            "PRI SHRANJEVANJU JE PRIŠLO DO NAPAKE!\n"
+            "Preberite napako in poskusite znova ali se posvetujte z asistentom.\n"
+            "-------------------------------------------------------------------\n"
+        )
+        print(_tomo_error_message)
+        traceback.print_exc()
+        print(_tomo_error_message)
+        sys.exit(0)
+    else:
+        print("Rešitve so shranjene.")
+        if "update" in _tomo_response:
+            print("Posodabljam datoteko... ", end="")
+            _tomo_backup_filename = _Tomo_Submit.backup(_tomo_user_filename)
+            with open(__file__, "wb") as _tomo_f:
+                _tomo_f.write(_tomo_response["update"].encode())
+            print("Prejšnja datoteka je bila preimenovana v {0}.".format(_tomo_backup_filename))
+            print("Če se datoteka ni osvežila v tvojem urejevalniku, jo zapri in ponovno odpri.")
+        else:
+            _Tomo_Submit.update_parts(Check.i18n_strings['HINT'], Check.parts, _tomo_response)
+    Check.summarize()
+
+
+if __name__ == "__main__":
+    _tomo_validate_current_file()
